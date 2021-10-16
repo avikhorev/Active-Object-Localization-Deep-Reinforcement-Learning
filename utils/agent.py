@@ -22,7 +22,7 @@ import torch.optim as optim
 import cv2 as cv
 from torch.autograd import Variable
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from config import *
 
 import glob
@@ -33,6 +33,7 @@ class Agent():
         """
             Classe initialisant l'ensemble des paramètres de l'apprentissage, un agent est associé à une classe donnée du jeu de données.
         """
+        print('----------------->>', use_cuda)
         self.BATCH_SIZE = 100
         self.GAMMA = 0.900
         self.EPS = 1
@@ -47,7 +48,7 @@ class Agent():
             self.policy_net = DQN(screen_height, screen_width, self.n_actions)
         else:
             self.policy_net = self.load_network()
-            
+
         self.target_net = DQN(screen_height, screen_width, self.n_actions)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
@@ -56,12 +57,12 @@ class Agent():
           self.feature_extractor = self.feature_extractor.cuda()
           self.target_net = self.target_net.cuda()
           self.policy_net = self.policy_net.cuda()
-        
+
         self.optimizer = optim.Adam(self.policy_net.parameters(),lr=1e-6)
         self.memory = ReplayMemory(10000)
         self.steps_done = 0
         self.episode_durations = []
-        
+
         self.alpha = alpha # €[0, 1]  Scaling factor
         self.nu = nu # Reward of Trigger
         self.threshold = threshold
@@ -97,7 +98,7 @@ class Agent():
         """
         x11, x21, y11, y21 = box1
         x12, x22, y12, y22 = box2
-        
+
         yi1 = max(y11, y12)
         xi1 = max(x11, x12)
         yi2 = min(y21, y22)
@@ -123,16 +124,16 @@ class Agent():
         if res <= 0:
             return -1
         return 1
-      
+
     def rewrap(self, coord):
         return min(max(coord,0), 224)
-      
+
     def compute_trigger_reward(self, actual_state, ground_truth):
         """
             Calcul de la récompensée associée à un état final selon les cas.
             Entrée :
                 Etat actuel et boite englobante de la vérité terrain
-            Sortie : 
+            Sortie :
                 Récompense attribuée
         """
         res = self.intersection_over_union(actual_state, ground_truth)
@@ -163,7 +164,7 @@ class Agent():
                 reward = self.compute_reward(new_equivalent_coord, actual_equivalent_coord, ground_truth)
             else:
                 reward = self.compute_trigger_reward(new_equivalent_coord,  ground_truth)
-            
+
             if reward>=0:
                 positive_actions.append(i)
             else:
@@ -177,7 +178,7 @@ class Agent():
         """
             Selection de l'action dépendemment de l'état
             Entrée :
-                - Etat actuel. 
+                - Etat actuel.
                 - Vérité terrain.
             Sortie :
                 - Soi l'action qu'aura choisi le modèle soi la meilleure action possible ( Le choix entre les deux se fait selon un jet aléatoire ).
@@ -235,13 +236,13 @@ class Agent():
         # Et ce pour éviter le biais occurant si on apprenait sur des états successifs
         transitions = self.memory.sample(self.BATCH_SIZE)
         batch = Transition(*zip(*transitions))
-        
+
         # Séparation des différents éléments contenus dans les différents echantillons
         non_final_mask = torch.Tensor(tuple(map(lambda s: s is not None, batch.next_state))).bool()
         next_states = [s for s in batch.next_state if s is not None]
-        non_final_next_states = Variable(torch.cat(next_states), 
+        non_final_next_states = Variable(torch.cat(next_states),
                                          volatile=True).type(Tensor)
-        
+
         state_batch = Variable(torch.cat(batch.state)).type(Tensor)
         if use_cuda:
             state_batch = state_batch.cuda()
@@ -253,13 +254,13 @@ class Agent():
         state_action_values = self.policy_net(state_batch).gather(1, action_batch)
 
         # Calcul de V(s_{t+1}) pour les prochain états.
-        next_state_values = Variable(torch.zeros(self.BATCH_SIZE, 1).type(Tensor)) 
+        next_state_values = Variable(torch.zeros(self.BATCH_SIZE, 1).type(Tensor))
 
         if use_cuda:
             non_final_next_states = non_final_next_states.cuda()
-        
+
         # Appel au second Q-Network ( celui de copie pour garantir la stabilité de l'apprentissage )
-        d = self.target_net(non_final_next_states) 
+        d = self.target_net(non_final_next_states)
         next_state_values[non_final_mask] = d.max(1)[0].view(-1,1)
         next_state_values.volatile = False
 
@@ -273,13 +274,13 @@ class Agent():
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        
-    
+
+
     def compose_state(self, image, dtype=FloatTensor):
         """
             Composition d'un état : Feature Vector + Historique des actions
             Entrée :
-                - Image ( feature vector ). 
+                - Image ( feature vector ).
             Sortie :
                 - Représentation d'état.
         """
@@ -289,7 +290,7 @@ class Agent():
         history_flatten = self.actions_history.view(1,-1).type(dtype)
         state = torch.cat((image_feature, history_flatten), 1)
         return state
-    
+
     def get_features(self, image, dtype=FloatTensor):
         """
             Extraction du feature vector à partir de l'image.
@@ -308,7 +309,7 @@ class Agent():
         #print("Feature shape : "+str(feature.shape))
         return feature.data
 
-    
+
     def update_history(self, action):
         """
             Fonction qui met à jour l'historique des actions en y ajoutant la dernière effectuée
@@ -323,7 +324,7 @@ class Agent():
         else:
             for i in range(8,0,-1):
                 self.actions_history[i][:] = self.actions_history[i-1][:]
-            self.actions_history[0][:] = action_vector[:] 
+            self.actions_history[0][:] = action_vector[:]
         return self.actions_history
 
     def calculate_position_box(self, actions, xmin=0, xmax=224, ymin=0, ymax=224):
@@ -347,7 +348,7 @@ class Agent():
             if r == 2: # Left
                 real_x_min -= alpha_w
                 real_x_max -= alpha_w
-            if r == 3: # Up 
+            if r == 3: # Up
                 real_y_min -= alpha_h
                 real_y_max -= alpha_h
             if r == 4: # Down
@@ -414,7 +415,7 @@ class Agent():
         new_image = image
 
         steps = 0
-        
+
         # Tant que le trigger n'est pas déclenché ou qu'on a pas atteint les 40 steps
         while not done:
             steps += 1
@@ -427,28 +428,28 @@ class Agent():
             else:
                 # Mise à jour de l'historique
                 self.actions_history = self.update_history(action)
-                new_equivalent_coord = self.calculate_position_box(all_actions)            
-                
+                new_equivalent_coord = self.calculate_position_box(all_actions)
+
                 # Récupération du contenu de la boite englobante
                 new_image = original_image[:, int(new_equivalent_coord[2]):int(new_equivalent_coord[3]), int(new_equivalent_coord[0]):int(new_equivalent_coord[1])]
                 try:
                     new_image = transform(new_image)
                 except ValueError:
-                    break            
-                
+                    break
+
                 # Composition : état + historique des 9 dernières actions
                 next_state = self.compose_state(new_image)
-            
+
             if steps == 40:
                 done = True
-            
+
             # Déplacement au nouvel état
             state = next_state
             image = new_image
-        
+
             if plot:
                 show_new_bdbox(original_image, new_equivalent_coord, color='b', count=steps)
-        
+
 
         # Génération d'un GIF représentant l'évolution de la prédiction
         if plot:
@@ -461,15 +462,15 @@ class Agent():
             images = []
             for count in range(1, steps+1):
                 images.append(imageio.imread(str(count)+".png"))
-            
+
             imageio.mimsave(fp_out, images)
-            
+
             for count in range(1, steps):
                 os.remove(str(count)+".png")
         return new_equivalent_coord
 
 
-    
+
     def evaluate(self, dataset):
         """
             Evaluation des performances du model sur un jeu de données.
@@ -505,12 +506,13 @@ class Agent():
 
         for i_episode in range(self.num_episodes):
             print("Episode "+str(i_episode))
-            for key, value in  train_loader.items():
+            for key, value in  tqdm(train_loader.items()):
+                # print(f'key={key}')
                 image, ground_truth_boxes = extract(key, train_loader)
                 original_image = image.clone()
                 ground_truth = ground_truth_boxes[0]
                 all_actions = []
-        
+
                 # Initialize the environment and state
                 self.actions_history = torch.ones((9,9))
                 state = self.compose_state(image)
@@ -534,17 +536,17 @@ class Agent():
                     else:
                         self.actions_history = self.update_history(action)
                         new_equivalent_coord = self.calculate_position_box(all_actions)
-                        
+
                         new_image = original_image[:, int(new_equivalent_coord[2]):int(new_equivalent_coord[3]), int(new_equivalent_coord[0]):int(new_equivalent_coord[1])]
                         try:
                             new_image = transform(new_image)
                         except ValueError:
-                            break                        
+                            break
 
                         next_state = self.compose_state(new_image)
                         closest_gt = self.get_max_bdbox( ground_truth_boxes, new_equivalent_coord )
                         reward = self.compute_reward(new_equivalent_coord, actual_equivalent_coord, closest_gt)
-                        
+
                         actual_equivalent_coord = new_equivalent_coord
                     if t == 20:
                         done = True
@@ -555,11 +557,11 @@ class Agent():
                     image = new_image
                     # Perform one step of the optimization (on the target network)
                     self.optimize_model()
-                    
-            
+
+
             if i_episode % self.TARGET_UPDATE == 0:
                 self.target_net.load_state_dict(self.policy_net.state_dict())
-            
+
             if i_episode<5:
                 self.EPS -= 0.18
             self.save_network()
@@ -578,14 +580,14 @@ class Agent():
         xmax = 224.0
         ymin = 0.0
         ymax = 224.0
-        for i_episode in range(self.num_episodes):  
+        for i_episode in range(self.num_episodes):
             print("Episode "+str(i_episode))
             for key, value in  train_loader.items():
                 image, ground_truth_boxes = extract(key, train_loader)
                 original_image = image.clone()
                 ground_truth = ground_truth_boxes[0]
                 all_actions = []
-        
+
                 # Initialize the environment and state
                 self.actions_history = torch.ones((9,9))
                 state = self.compose_state(image)
@@ -609,21 +611,21 @@ class Agent():
                     else:
                         self.actions_history = self.update_history(action)
                         new_equivalent_coord = self.calculate_position_box(all_actions)
-                        
+
                         new_image = original_image[:, int(new_equivalent_coord[2]):int(new_equivalent_coord[3]), int(new_equivalent_coord[0]):int(new_equivalent_coord[1])]
                         try:
                             new_image = transform(new_image)
                         except ValueError:
-                            break                        
+                            break
                         if False:
                             show_new_bdbox(original_image, ground_truth, color='r')
                             show_new_bdbox(original_image, new_equivalent_coord, color='b')
-                            
+
 
                         next_state = self.compose_state(new_image)
                         closest_gt = self.get_max_bdbox( ground_truth_boxes, new_equivalent_coord )
                         reward = self.compute_reward(new_equivalent_coord, actual_equivalent_coord, closest_gt)
-                        
+
                         actual_equivalent_coord = new_equivalent_coord
                     if t == 20:
                         done = True
@@ -634,16 +636,16 @@ class Agent():
                     image = new_image
                     # Optimisation
                     self.optimize_model()
-                    
+
             stats = self.evaluate(valid_loader)
             op.write("\n")
             op.write("Episode "+str(i_episode))
             op.write(str(stats))
             if i_episode % self.TARGET_UPDATE == 0:
                 self.target_net.load_state_dict(self.policy_net.state_dict())
-            
+
             if i_episode<5:
                 self.EPS -= 0.18
             self.save_network()
-            
+
             print('Complete')

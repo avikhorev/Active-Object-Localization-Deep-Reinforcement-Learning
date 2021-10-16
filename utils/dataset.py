@@ -1,9 +1,10 @@
 import torchvision.transforms as transforms
 import torchvision
 from torch.utils.data import DataLoader
+from config import *
 
-batch_size = 32
-PATH="./datasets/"
+# batch_size = 32
+# PATH="./datasets/"
 
 
 class CustomRotation(object):
@@ -29,7 +30,7 @@ def get_transform(train):
     transf.append(transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                   std=[0.229, 0.224, 0.225]))
     return transforms.Compose(transf)
-    
+
 def make_image_transform(image_transform_params: dict,
                          transform: object):
     resize_image = image_transform_params['image_mode']
@@ -62,11 +63,11 @@ def read_voc_dataset(download=True, year='2007'):
                             transforms.ToTensor(),
                              #CustomRotation()
                             ])
-    voc_data =  torchvision.datasets.VOCDetection(PATH, year=year, image_set='train', 
+    voc_data =  torchvision.datasets.VOCDetection(PATH, year=year, image_set='train',
                         download=download, transform=T)
     train_loader = DataLoader(voc_data,shuffle=True)
 
-    voc_val =  torchvision.datasets.VOCDetection(PATH, year=year, image_set='val', 
+    voc_val =  torchvision.datasets.VOCDetection(PATH, year=year, image_set='val',
                         download=download, transform=T)
     val_loader = DataLoader(voc_val,shuffle=False)
 
@@ -110,11 +111,11 @@ def read_sbd_dataset(batch_size, download=True):
                             transforms.Resize((224, 224)),
                             transforms.ToTensor()
                             ])
-    voc_data =  NoisySBDataset(PATH, image_set='train', 
+    voc_data =  NoisySBDataset(PATH, image_set='train',
                         download=download, transforms=T)
     train_loader = DataLoader(voc_data, batch_size=32,shuffle=False,  collate_fn=lambda x: x)
 
-    voc_val =  NoisySBDataset(PATH, image_set='val', 
+    voc_val =  NoisySBDataset(PATH, image_set='val',
                         download=download, transforms=T)
     val_loader = DataLoader(voc_val, batch_size=32,shuffle=False,  collate_fn=lambda x: x)
 

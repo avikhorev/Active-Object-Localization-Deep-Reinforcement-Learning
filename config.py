@@ -6,9 +6,9 @@ import torchvision.transforms as transforms
 
 try:
     if 'google.colab' in str(get_ipython()):
-        from google.colab import drive
-        drive.mount('/content/gdrive')
-        LOAD = True
+        # from google.colab import drive
+        # drive.mount('/content/gdrive')
+        LOAD = False
         SAVE_MODEL_PATH = '/content/gdrive/MyDrive/models/' + 'q_network'
     else:
         LOAD = False
@@ -17,14 +17,16 @@ except NameError:
         LOAD = False
         SAVE_MODEL_PATH = "./models/q_network"
 
+batch_size = 32
+PATH="/content/data/voctrainval_06-nov-2007/"
 
-use_cuda = True
+use_cuda = False
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if use_cuda else torch.LongTensor
 ByteTensor = torch.cuda.ByteTensor if use_cuda else torch.ByteTensor
 Tensor = FloatTensor
 if use_cuda:
-    criterion = nn.MSELoss().cuda()   
+    criterion = nn.MSELoss().cuda()
 else:
     criterion = nn.MSELoss()
 

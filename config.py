@@ -18,7 +18,7 @@ except NameError:
         SAVE_MODEL_PATH = "./models/q_network"
 
 batch_size = 32
-PATH="/content/data/voctrainval_06-nov-2007/"
+PATH="./datasets/"
 
 use_cuda = False
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
